@@ -80,6 +80,17 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 Para el detalle de endpoints, DTOs y reglas de negocio del backend, consulta el **[README y AGENTS.md del backend](../kiosko-backend/README.md)**.
 
+## Despliegue en Vercel
+
+1. Conecta el repo de GitHub en [vercel.com](https://vercel.com) → **Add New** → **Project**.
+2. Vercel detecta Next.js; no hace falta cambiar **Build** ni **Output**.
+3. Añade la variable de entorno:
+   - **Key**: `NEXT_PUBLIC_API_URL`
+   - **Value**: URL de tu API (ej. `https://kiosko-api.onrender.com/api`).
+4. **Deploy**. La app quedará en `https://tu-proyecto.vercel.app`.
+
+En el backend (Render/Railway) configura `CORS_ORIGINS` con la URL de Vercel (ej. `https://tu-proyecto.vercel.app`) para permitir peticiones desde el frontend.
+
 ## Licencia
 
 Uso interno / proyecto Kiosko.
