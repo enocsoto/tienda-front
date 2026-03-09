@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kiosko Frontend
 
-## Getting Started
+Frontend del **Sistema Kiosko**: aplicación web para administración (inventario, ventas, caja, créditos, configuración) y tienda pública para pedidos. Desarrollado con Next.js (App Router) y Tailwind CSS.
 
-First, run the development server:
+## Stack
+
+- **Framework**: Next.js 16, React 19, TypeScript
+- **Estilos**: Tailwind CSS 4
+- **Iconos**: Lucide React
+- **API**: Consumo del backend Kiosko vía `fetch` (token JWT en `localStorage`)
+
+## Requisitos
+
+- Node.js 20+
+- Backend Kiosko en ejecución (por defecto `http://localhost:3001/api`). Ver [kiosko-backend](../kiosko-backend) para levantar el API.
+
+## Instalación
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variables de entorno
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Crea un archivo `.env.local` en la raíz del proyecto. Ejemplo:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+# URL base del API (por defecto: http://localhost:3001/api)
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+```
 
-## Learn More
+## Ejecución
 
-To learn more about Next.js, take a look at the following resources:
+- **Desarrollo**:
+  ```bash
+  npm run dev
+  ```
+  Abre [http://localhost:3000](http://localhost:3000).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Producción**:
+  ```bash
+  npm run build
+  npm run start
+  ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Lint**:
+  ```bash
+  npm run lint
+  ```
 
-## Deploy on Vercel
+## Estructura de la aplicación
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Ruta | Descripción |
+|------|-------------|
+| `/` | Página principal (landing / inicio) |
+| `/login` | Inicio de sesión (admin) |
+| `/comprar` | Tienda pública: catálogo y pedidos (envío a domicilio) |
+| `/admin/*` | Panel de administración (requiere login) |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Panel Admin
+
+- **Inventario** — Listado, nuevo producto, editar, importar Excel
+- **Ventas** — Registrar venta, historial
+- **Créditos** — Listado y pagos de créditos
+- **Caja** — Balance, egresos, utilidad
+- **Configuración** — Ganancia, cuentas Nequi
+- **Notificaciones** — Stock crítico, pedidos recibidos
+
+## Diseño
+
+- **Tema**: Sky Blue y blanco (profesional y limpio).
+- **Componentes reutilizables**: `src/components/ui/` (Badge, PageHeader, StatCard, Toast, etc.).
+- **Utilidades**: `src/lib/api.ts` (fetch con token), `src/lib/format.ts`, `src/lib/inventario.ts`.
+
+## API y autenticación
+
+- El frontend usa `NEXT_PUBLIC_API_URL` para todas las peticiones al backend.
+- Tras el login, el token JWT se guarda en `localStorage` y se envía en el header `Authorization: Bearer <token>` en las rutas protegidas.
+- Rutas públicas (catálogo y crear pedido en `/comprar`) no envían token.
+
+Para el detalle de endpoints, DTOs y reglas de negocio del backend, consulta el **[README y AGENTS.md del backend](../kiosko-backend/README.md)**.
+
+## Licencia
+
+Uso interno / proyecto Kiosko.
