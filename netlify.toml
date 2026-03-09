@@ -1,0 +1,15 @@
+# Configuración de despliegue en Netlify para Next.js (App Router)
+# Evita el error "Page not found" 404 en rutas como /, /admin, /comprar, etc.
+
+[build]
+  command = "npm run build"
+  # El plugin @netlify/plugin-nextjs define publish y funciones; no hace falta ponerlo aquí.
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Plugin oficial de Netlify para Next.js: genera y sirve correctamente
+# todas las rutas (SSR, estáticas, client-side). Sin esto Netlify no
+# entiende la estructura de Next.js y devuelve 404.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
