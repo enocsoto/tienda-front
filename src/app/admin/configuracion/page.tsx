@@ -346,7 +346,7 @@ export default function ConfiguracionPage() {
                           <button
                             type="button"
                             onClick={() => handleEditNequi(i)}
-                            className="p-2 rounded-lg text-sky-600 hover:bg-sky-50"
+                            className="p-2 rounded-lg text-sky-600 hover:bg-sky-50 cursor-pointer"
                             title="Editar"
                           >
                             <Pencil className="w-4 h-4" />
@@ -354,7 +354,7 @@ export default function ConfiguracionPage() {
                           <button
                             type="button"
                             onClick={() => handleDeleteNequi(i)}
-                            className="p-2 rounded-lg text-red-600 hover:bg-red-50"
+                            className="p-2 rounded-lg text-red-600 hover:bg-red-50 cursor-pointer"
                             title="Eliminar"
                           >
                             <Trash2 className="w-4 h-4" />

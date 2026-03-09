@@ -24,6 +24,12 @@ import {
   Package,
 } from "lucide-react";
 
+const UNIDADES_DECIMALES = ["gramos", "g", "kg", "litro", "ml", "lb"];
+
+function isUnidadDecimal(unidad?: string): boolean {
+  return !!unidad && UNIDADES_DECIMALES.includes(unidad.toLowerCase());
+}
+
 interface Product {
   id: string;
   nombre: string;
@@ -139,17 +145,19 @@ export default function ComprarPage() {
 
   const addToCart = (product: Product) => {
     if (product.stock_actual <= 0) return;
+    const esGramos = isUnidadDecimal(product.unidad);
+    const cantidadInicial = esGramos ? Math.min(100, product.stock_actual) : 1;
     setCart((prev) => {
       const existing = prev.find((e) => e.product.id === product.id);
       if (existing) {
-        if (existing.cantidad >= product.stock_actual) return prev;
+        const delta = esGramos ? 100 : 1;
+        const nuevaCantidad = Math.min(existing.cantidad + delta, product.stock_actual);
+        if (nuevaCantidad <= existing.cantidad) return prev;
         return prev.map((e) =>
-          e.product.id === product.id
-            ? { ...e, cantidad: e.cantidad + 1 }
-            : e
+          e.product.id === product.id ? { ...e, cantidad: nuevaCantidad } : e
         );
       }
-      return [...prev, { product, cantidad: 1 }];
+      return [...prev, { product, cantidad: cantidadInicial }];
     });
   };
 
@@ -158,7 +166,26 @@ export default function ComprarPage() {
       prev
         .map((e) => {
           if (e.product.id !== productId) return e;
-          const newQty = Math.max(1, Math.min(e.product.stock_actual, e.cantidad + delta));
+          const esGramos = isUnidadDecimal(e.product.unidad);
+          const step = esGramos ? 10 : 1;
+          const minQty = esGramos ? 1 : 1;
+          const newQty = Math.max(minQty, Math.min(e.product.stock_actual, e.cantidad + delta * step));
+          return { ...e, cantidad: newQty };
+        })
+        .filter((e) => e.cantidad > 0)
+    );
+  };
+
+  const setCantidadDirect = (productId: string, value: number) => {
+    setCart((prev) =>
+      prev
+        .map((e) => {
+          if (e.product.id !== productId) return e;
+          const esGramos = isUnidadDecimal(e.product.unidad);
+          const minQty = esGramos ? 1 : 1;
+          const parsed = Number(value);
+          if (Number.isNaN(parsed) || parsed < minQty) return { ...e, cantidad: minQty };
+          const newQty = Math.max(minQty, Math.min(e.product.stock_actual, parsed));
           return { ...e, cantidad: newQty };
         })
         .filter((e) => e.cantidad > 0)
@@ -219,12 +246,13 @@ export default function ComprarPage() {
           <p className="text-slate-600 mb-8">
             Te contactaremos por WhatsApp para confirmar. Revisa tu teléfono.
           </p>
-          <Link
-            href="/comprar"
+          <button
+            type="button"
+            onClick={() => setSuccess(false)}
             className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-700"
           >
             Hacer otro pedido
-          </Link>
+          </button>
         </div>
       </main>
     );
@@ -291,7 +319,27 @@ export default function ComprarPage() {
                             >
                               <Minus className="w-4 h-4" />
                             </button>
-                            <span className="w-7 text-center text-sm font-medium tabular-nums">{e.cantidad}</span>
+                            <input
+                              type="number"
+                              min={isUnidadDecimal(e.product.unidad) ? 1 : 1}
+                              max={e.product.stock_actual}
+                              step={isUnidadDecimal(e.product.unidad) ? 10 : 1}
+                              value={isUnidadDecimal(e.product.unidad)
+                                ? (e.cantidad % 1 === 0 ? e.cantidad : e.cantidad.toFixed(1))
+                                : e.cantidad}
+                              onChange={(ev) => {
+                                const v = ev.target.value;
+                                const num = isUnidadDecimal(e.product.unidad)
+                                  ? parseFloat(v) || 0
+                                  : Math.floor(parseFloat(v) || 0);
+                                setCantidadDirect(e.product.id, num);
+                              }}
+                              className="w-12 text-center text-sm font-medium tabular-nums border border-slate-200 rounded-lg py-1 px-1 focus:border-sky-400 focus:ring-1 focus:ring-sky-100 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              aria-label="Cantidad"
+                            />
+                            {isUnidadDecimal(e.product.unidad) && (
+                              <span className="text-xs text-slate-500 self-center">g</span>
+                            )}
                             <button
                               type="button"
                               onClick={() => updateCantidad(e.product.id, 1)}
@@ -381,6 +429,9 @@ export default function ComprarPage() {
                           <p className="text-sm text-slate-500">{p.categoria}</p>
                           <p className="text-sky-600 font-semibold mt-0.5">
                             {formatCOP(p.precio_venta)}
+                            {isUnidadDecimal(p.unidad) && (
+                              <span className="text-slate-500 font-normal text-xs"> /g</span>
+                            )}
                           </p>
                         </div>
                         <button
@@ -478,9 +529,27 @@ export default function ComprarPage() {
                         >
                           <Minus className="w-3 h-3" />
                         </button>
-                        <span className="w-7 text-center text-xs font-medium tabular-nums">
-                          {e.cantidad}
-                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={e.product.stock_actual}
+                          step={isUnidadDecimal(e.product.unidad) ? 10 : 1}
+                          value={isUnidadDecimal(e.product.unidad)
+                            ? (e.cantidad % 1 === 0 ? e.cantidad : e.cantidad.toFixed(1))
+                            : e.cantidad}
+                          onChange={(ev) => {
+                            const v = ev.target.value;
+                            const num = isUnidadDecimal(e.product.unidad)
+                              ? parseFloat(v) || 0
+                              : Math.floor(parseFloat(v) || 0);
+                            setCantidadDirect(e.product.id, num);
+                          }}
+                          className="w-9 text-center text-xs font-medium tabular-nums border border-slate-200 rounded-lg py-0.5 px-0.5 focus:border-sky-400 focus:ring-1 focus:ring-sky-100 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          aria-label="Cantidad"
+                        />
+                        {isUnidadDecimal(e.product.unidad) && (
+                          <span className="text-[10px] text-slate-500 self-center">g</span>
+                        )}
                         <button
                           type="button"
                           onClick={() => updateCantidad(e.product.id, 1)}

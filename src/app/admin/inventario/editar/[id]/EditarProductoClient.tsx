@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { fetchApi } from "@/lib/api";
+import { formatNumberInput, parseNumberInput } from "@/lib/format";
 import Link from "next/link";
 import { ArrowLeft, Pencil, Save, ImageIcon } from "lucide-react";
 
@@ -27,6 +28,7 @@ export function EditarProductoClient({ id }: EditarProductoClientProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [costoDisplay, setCostoDisplay] = useState("0");
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -41,6 +43,7 @@ export function EditarProductoClient({ id }: EditarProductoClientProps) {
           unidad: data.unidad ?? "unidad",
           imagen: data.imagen ?? "",
         });
+        setCostoDisplay(formatNumberInput(data.costo));
       } catch {
         setError("Error al cargar el producto");
       } finally {
@@ -52,10 +55,21 @@ export function EditarProductoClient({ id }: EditarProductoClientProps) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === "costo") {
+      setCostoDisplay(value);
+      setForm((prev) => ({ ...prev, costo: parseNumberInput(value) }));
+      return;
+    }
     setForm((prev) => ({
       ...prev,
       [name]: e.target.type === "number" ? Number(value) : value,
     }));
+  };
+
+  const handleCostoBlur = () => {
+    const parsed = parseNumberInput(costoDisplay);
+    setForm((prev) => ({ ...prev, costo: parsed }));
+    setCostoDisplay(formatNumberInput(parsed));
   };
 
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +137,7 @@ export function EditarProductoClient({ id }: EditarProductoClientProps) {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900">Editar Producto</h1>
-          <p className="text-sm text-slate-500">Modifica costo y stock</p>
+          <p className="text-sm text-slate-500">Modifica costo y cantidad</p>
         </div>
       </div>
 
@@ -226,13 +240,14 @@ export function EditarProductoClient({ id }: EditarProductoClientProps) {
                   $
                 </span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   name="costo"
-                  min="0"
-                  step="0.01"
                   required
-                  value={form.costo}
+                  value={costoDisplay}
                   onChange={handleChange}
+                  onBlur={handleCostoBlur}
+                  placeholder="0"
                   className="w-full pl-8 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 text-sm focus:bg-white focus:border-sky-400 focus:outline-none focus:ring-3 focus:ring-sky-100 transition-all"
                 />
               </div>

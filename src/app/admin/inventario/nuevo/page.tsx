@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { fetchApi } from "@/lib/api";
+import { formatNumberInput, parseNumberInput } from "@/lib/format";
 import { getCategoriasDisponibles, crearCategoria } from "@/lib/inventario";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Package, Save } from "lucide-react";
+import { ArrowLeft, ChevronDown, Package, Save, ImageIcon } from "lucide-react";
 
 const OPCION_NUEVA_CATEGORIA = "__nueva__";
 
@@ -18,6 +20,7 @@ interface FormState {
   costo: string;
   stock_actual: string;
   unidad: string;
+  imagen: string;
 }
 
 const initialForm: FormState = {
@@ -27,6 +30,7 @@ const initialForm: FormState = {
   costo: "",
   stock_actual: "",
   unidad: "unidad",
+  imagen: "",
 };
 
 export default function NuevoProductoPage() {
@@ -51,10 +55,31 @@ export default function NuevoProductoPage() {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const { name, value } = e.target;
+      if (name === "costo") {
+        setForm((prev) => ({ ...prev, costo: value }));
+        return;
+      }
       setForm((prev) => ({ ...prev, [name]: value }));
     },
     []
   );
+
+  const handleCostoBlur = useCallback(() => {
+    const parsed = parseNumberInput(form.costo);
+    setForm((prev) => ({ ...prev, costo: formatNumberInput(parsed) }));
+  }, [form.costo]);
+
+  const handleImageFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setForm((prev) => ({ ...prev, imagen: dataUrl }));
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,9 +103,10 @@ export default function NuevoProductoPage() {
         body: JSON.stringify({
           nombre: form.nombre,
           categoria: categoriaFinal,
-          costo: Number(form.costo),
+          costo: parseNumberInput(form.costo),
           stock_actual: Number(form.stock_actual),
           unidad: form.unidad || "unidad",
+          imagen: form.imagen.trim() || undefined,
         }),
       });
       router.refresh();
@@ -125,6 +151,56 @@ export default function NuevoProductoPage() {
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Imagen del producto
+            </label>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 text-sm font-medium hover:bg-slate-100 cursor-pointer transition-colors shrink-0">
+                <ImageIcon className="w-4 h-4" />
+                Subir imagen desde el dispositivo
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFile}
+                  className="sr-only"
+                />
+              </label>
+              <span className="text-slate-400 text-sm self-center">o</span>
+              <input
+                type="url"
+                name="imagen"
+                value={form.imagen?.startsWith("data:") ? "" : form.imagen}
+                onChange={handleChange}
+                placeholder="Pegar URL (ej. https://ejemplo.com/imagen.jpg)"
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 text-sm focus:bg-white focus:border-sky-400 focus:outline-none focus:ring-3 focus:ring-sky-100 transition-all"
+              />
+            </div>
+            {form.imagen && (
+              <div className="mt-3 flex items-start gap-3">
+                <div className="relative w-32 h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                  <Image
+                    src={form.imagen}
+                    alt="Vista previa"
+                    fill
+                    className="object-cover"
+                    sizes="128px"
+                    unoptimized
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).parentElement?.classList.add("hidden");
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, imagen: "" }))}
+                  className="text-sm text-slate-500 hover:text-red-600 transition-colors"
+                >
+                  Quitar imagen
+                </button>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <label htmlFor="nuevo-producto-nombre" className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -197,14 +273,14 @@ export default function NuevoProductoPage() {
                 </span>
                 <input
                   id="nuevo-producto-costo"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   name="costo"
-                  min={0}
-                  step={0.01}
                   required
                   value={form.costo}
                   onChange={handleChange}
-                  placeholder="0.00"
+                  onBlur={handleCostoBlur}
+                  placeholder="0"
                   className="w-full pl-8 pr-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 text-sm focus:bg-white focus:border-sky-400 focus:outline-none focus:ring-3 focus:ring-sky-100 transition-all"
                 />
               </div>

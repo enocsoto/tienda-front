@@ -14,6 +14,12 @@
   box-sizing: border-box;
 }
 
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a {
+  cursor: pointer;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

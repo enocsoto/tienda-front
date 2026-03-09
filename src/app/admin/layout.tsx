@@ -16,10 +16,12 @@ import {
   History,
   CreditCard,
   TrendingUp,
+  HandCoins,
 } from "lucide-react";
 import { Toast, ToastMessage } from "@/components/ui/Toast";
 
 const SIDEBAR_COLLAPSED_KEY = "kiosko-sidebar-collapsed";
+const NOTIFICATIONS_UPDATED_EVENT = "kiosko-notifications-updated";
 const TIENDA_NOMBRE_KEY = "kiosko_tienda_nombre";
 const TIENDA_LOGO_KEY = "kiosko_tienda_logo";
 const TIENDA_UPDATED_EVENT = "kiosko-tienda-updated";
@@ -66,6 +68,7 @@ const navItems: NavItem[] = [
     icon: Wallet,
     children: [
       { name: "Balance Diario", href: "/admin/caja", icon: Wallet },
+      { name: "Préstamos", href: "/admin/prestamos", icon: HandCoins },
       { name: "Utilidades", href: "/admin/caja/utilidad", icon: TrendingUp },
     ],
   },
@@ -104,6 +107,21 @@ export default function AdminLayout(props: AdminLayoutProps) {
     const onTiendaUpdated = () => setTienda(getTiendaFromStorage());
     window.addEventListener(TIENDA_UPDATED_EVENT, onTiendaUpdated);
     return () => window.removeEventListener(TIENDA_UPDATED_EVENT, onTiendaUpdated);
+  }, []);
+
+  useEffect(() => {
+    const onNotificationsUpdated = () => {
+      import("@/lib/api").then(({ fetchApi }) =>
+        fetchApi("/notifications/unread-count").then((data: unknown) => {
+          const count = typeof (data as { count?: number })?.count === "number"
+            ? (data as { count: number }).count
+            : 0;
+          setUnread(count);
+        }).catch(() => {})
+      );
+    };
+    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, onNotificationsUpdated);
+    return () => window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, onNotificationsUpdated);
   }, []);
 
   const toggleSidebar = () => {
@@ -177,11 +195,15 @@ export default function AdminLayout(props: AdminLayoutProps) {
     loadUnread(false);
     intervalId = setInterval(() => {
       loadUnread(true);
-    }, 30000);
+    }, 10000);
+
+    const onFocus = () => loadUnread(false);
+    window.addEventListener("focus", onFocus);
 
     return () => {
       isActive = false;
       if (intervalId) clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
     };
   }, [user, pathname]);
 
@@ -295,10 +317,15 @@ export default function AdminLayout(props: AdminLayoutProps) {
                   }`}
                   title={item.name}
                 >
-                  <Icon className="w-5 h-5 shrink-0" />
-                  {item.name === "Notificaciones" && unread > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-                  )}
+                  <span className="relative inline-flex">
+                    <Icon className="w-5 h-5 shrink-0" />
+                    {item.name === "Notificaciones" && unread > 0 && (
+                      <span
+                        className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"
+                        aria-label={`${unread} sin leer`}
+                      />
+                    )}
+                  </span>
                 </Link>
               );
             }
@@ -358,11 +385,19 @@ export default function AdminLayout(props: AdminLayoutProps) {
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
                 }`}
               >
-                <Icon className="w-4.5 h-4.5 shrink-0" />
+                <span className="relative inline-flex shrink-0">
+                  <Icon className="w-4.5 h-4.5" />
+                  {item.name === "Notificaciones" && unread > 0 && (
+                    <span
+                      className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"
+                      aria-label={`${unread} sin leer`}
+                    />
+                  )}
+                </span>
                 <span className="flex-1">{item.name}</span>
                 {item.name === "Notificaciones" && unread > 0 && (
                   <span
-                    className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                    className={`text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
                       isActive ? "bg-white/20 text-white" : "bg-red-500 text-white"
                     }`}
                   >
@@ -429,11 +464,14 @@ export default function AdminLayout(props: AdminLayoutProps) {
           <div className="flex items-center gap-3">
             <Link
               href="/admin/notificaciones"
-              className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              className="relative inline-flex p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
               <Bell className="w-5 h-5" />
               {unread > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                <span
+                  className="absolute top-0.5 right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"
+                  aria-label={`${unread} sin leer`}
+                />
               )}
             </Link>
           </div>

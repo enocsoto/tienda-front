@@ -19,7 +19,7 @@ interface Notificacion {
 
 const tipoConfig: Record<string, { label: string; color: string }> = {
   CREDITO_VENCIDO: { label: "Crédito", color: "bg-red-100 text-red-700" },
-  STOCK_CRITICO: { label: "Poco stock", color: "bg-amber-100 text-amber-700" },
+  STOCK_CRITICO: { label: "Poco producto", color: "bg-amber-100 text-amber-700" },
   PEDIDO_RECIBIDO: { label: "Pedido recibido", color: "bg-emerald-100 text-emerald-700" },
   VENTA_ANULADA: { label: "Venta", color: "bg-slate-100 text-slate-600" },
   MARKUP_CAMBIO: { label: "Config", color: "bg-sky-100 text-sky-700" },
@@ -60,6 +60,7 @@ export default function NotificacionesPage() {
         prev.map((n) => (n.id === id ? { ...n, fecha_visto: new Date().toISOString() } : n))
       );
       router.refresh();
+      window.dispatchEvent(new CustomEvent("kiosko-notifications-updated"));
     } catch {
       /* ignore */
     }
@@ -71,6 +72,7 @@ export default function NotificacionesPage() {
       setToast({ text: "Todas las notificaciones marcadas como leídas", type: "success" });
       loadNotifications();
       router.refresh();
+      window.dispatchEvent(new CustomEvent("kiosko-notifications-updated"));
     } catch {
       /* ignore */
     }

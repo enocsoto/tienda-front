@@ -3,8 +3,34 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchApi } from "@/lib/api";
 import { formatCOP } from "@/lib/format";
-import { Search, User, Calendar, Check, ArrowRight, ArrowLeft, Plus, Minus, Trash2 } from "lucide-react";
+import { Search, User, Calendar, Check, ArrowRight, ArrowLeft, Plus, Minus, Trash2, Package } from "lucide-react";
 import { Toast, ToastMessage } from "@/components/ui/Toast";
+
+const UNIDADES_DECIMALES = ["gramos", "g", "kg", "litro", "ml", "lb"];
+
+function isUnidadDecimal(unidad?: string): boolean {
+  return !!unidad && UNIDADES_DECIMALES.includes(unidad.toLowerCase());
+}
+
+/** Paso de incremento según unidad: 1 para unidades enteras, 1 o 0.1 para decimales. */
+function getStepForUnidad(unidad?: string): number {
+  if (!unidad) return 1;
+  const u = unidad.toLowerCase();
+  if (u === "litro" || u === "kg" || u === "lb") return 0.1;
+  return 1;
+}
+
+/** Sufijo para mostrar cantidad según unidad. */
+function getUnidadSufijo(unidad?: string): string {
+  if (!unidad) return "";
+  const u = unidad.toLowerCase();
+  if (u === "gramos" || u === "g") return " g";
+  if (u === "kg") return " kg";
+  if (u === "lb") return " lb";
+  if (u === "litro") return " L";
+  if (u === "ml") return " ml";
+  return "";
+}
 
 interface Product {
   id: string;
@@ -12,6 +38,8 @@ interface Product {
   categoria: string;
   precio_venta: number;
   stock_actual: number;
+  unidad?: string;
+  imagen?: string;
 }
 
 interface CartItem extends Product {
@@ -31,6 +59,9 @@ export default function POSPage() {
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [clienteNombre, setClienteNombre] = useState("");
   const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [searchCheckout, setSearchCheckout] = useState("");
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [searchCheckoutLoading, setSearchCheckoutLoading] = useState(false);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -45,19 +76,42 @@ export default function POSPage() {
     loadProducts();
   }, [loadProducts]);
 
-  const addToCart = (product: Product) => {
+  const searchProductsForCheckout = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchCheckoutLoading(true);
+    try {
+      const data = await fetchApi(`/inventario?search=${encodeURIComponent(query.trim())}`);
+      setSearchResults(Array.isArray(data) ? data : []);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchCheckoutLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => searchProductsForCheckout(searchCheckout), 250);
+    return () => clearTimeout(t);
+  }, [searchCheckout, searchProductsForCheckout]);
+
+  const addProductToCart = (product: Product) => {
     if (product.stock_actual <= 0) return;
     setCart((prev) => {
       const existing = prev.find((p) => p.id === product.id);
+      const step = getStepForUnidad(product.unidad);
+      const cantidadInicial = 1;
       if (existing) {
-        if (existing.cantidad >= product.stock_actual) return prev;
+        const nuevaCantidad = Math.min(existing.cantidad + step, product.stock_actual);
         return prev.map((p) =>
           p.id === product.id
-            ? { ...p, cantidad: p.cantidad + 1, subtotal: (p.cantidad + 1) * p.precio_venta }
+            ? { ...p, cantidad: nuevaCantidad, subtotal: nuevaCantidad * p.precio_venta }
             : p
         );
       }
-      return [...prev, { ...product, cantidad: 1, subtotal: product.precio_venta }];
+      return [...prev, { ...product, cantidad: cantidadInicial, subtotal: cantidadInicial * product.precio_venta }];
     });
   };
 
@@ -67,18 +121,34 @@ export default function POSPage() {
 
   const updateQty = (id: string, delta: number) => {
     setCart((prev) =>
-      prev
-        .map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                cantidad: Math.max(1, Math.min(p.cantidad + delta, p.stock_actual)),
-                subtotal: Math.max(1, Math.min(p.cantidad + delta, p.stock_actual)) * p.precio_venta,
-              }
-            : p
-        )
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const step = getStepForUnidad(p.unidad);
+        const minQty = isUnidadDecimal(p.unidad) ? 0.001 : 1;
+        const nuevaCantidad = Math.max(minQty, Math.min(p.cantidad + delta * step, p.stock_actual));
+        return { ...p, cantidad: nuevaCantidad, subtotal: nuevaCantidad * p.precio_venta };
+      })
     );
   };
+
+  const setQtyDirect = (id: string, rawValue: string | number) => {
+    const item = cart.find((p) => p.id === id);
+    const esDecimal = item && isUnidadDecimal(item.unidad);
+    const num = typeof rawValue === "string" ? (esDecimal ? parseFloat(rawValue.replace(",", ".")) : parseInt(rawValue, 10)) : rawValue;
+    if (Number.isNaN(num) || num < (esDecimal ? 0.001 : 1)) return;
+    setCart((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const cantidad = Math.min(num, p.stock_actual);
+        return { ...p, cantidad, subtotal: cantidad * p.precio_venta };
+      })
+    );
+  };
+
+  const formatCantidad = (item: CartItem) =>
+    isUnidadDecimal(item.unidad)
+      ? `${item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(2)}${getUnidadSufijo(item.unidad)}`
+      : String(item.cantidad);
 
   const total = cart.reduce((acc, item) => acc + item.subtotal, 0);
 
@@ -133,12 +203,80 @@ export default function POSPage() {
               {cart.length} {cart.length === 1 ? "producto" : "productos"}
             </span>
           </div>
+          <div className="px-5 py-3 border-b border-slate-100">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="search"
+                value={searchCheckout}
+                onChange={(e) => setSearchCheckout(e.target.value)}
+                placeholder="Buscar producto para agregar..."
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 outline-none"
+                aria-label="Buscar producto para agregar"
+              />
+              {searchCheckout && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchCheckout("");
+                    setSearchResults([]);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm"
+                  aria-label="Limpiar búsqueda"
+                >
+                  ×
+                </button>
+              )}
+              {searchResults.length > 0 && (
+                <ul className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg z-10 py-1">
+                  {searchResults.map((p) => {
+                    const inCart = cart.some((c) => c.id === p.id);
+                    return (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addProductToCart(p);
+                            setSearchCheckout("");
+                            setSearchResults([]);
+                          }}
+                          disabled={p.stock_actual <= 0}
+                          className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            inCart ? "bg-sky-50" : ""
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-800 truncate">{p.nombre}</p>
+                            <p className="text-xs text-slate-500">
+                              {formatCOP(p.precio_venta)}
+                              {isUnidadDecimal(p.unidad) && `/${getUnidadSufijo(p.unidad).trim() || "g"}`}
+                              {p.stock_actual <= 0 && " · Sin stock"}
+                            </p>
+                          </div>
+                          <Plus className="w-4 h-4 text-sky-600 shrink-0" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {searchCheckout && searchCheckoutLoading && (
+                <p className="absolute left-9 top-full mt-1 text-xs text-slate-500">Buscando...</p>
+              )}
+              {searchCheckout && !searchCheckoutLoading && searchResults.length === 0 && searchCheckout.trim().length >= 2 && (
+                <p className="absolute left-9 top-full mt-1 text-xs text-slate-500">No se encontraron productos</p>
+              )}
+            </div>
+          </div>
           <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
             {cart.map((item) => (
               <div key={item.id} className="flex items-center justify-between gap-3 px-5 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-800">{item.nombre}</p>
-                  <p className="text-xs text-slate-400">{item.cantidad} × {formatCOP(item.precio_venta)}</p>
+                  <p className="text-xs text-slate-400">
+                    {formatCantidad(item)} × {formatCOP(item.precio_venta)}
+                    {isUnidadDecimal(item.unidad) && `/${getUnidadSufijo(item.unidad).trim() || "g"}`}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
@@ -149,7 +287,16 @@ export default function POSPage() {
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="w-8 text-center text-sm font-medium tabular-nums">{item.cantidad}</span>
+                  <input
+                    type="number"
+                    min={isUnidadDecimal(item.unidad) ? 0.001 : 1}
+                    max={item.stock_actual}
+                    step={getStepForUnidad(item.unidad)}
+                    value={item.cantidad}
+                    onChange={(e) => setQtyDirect(item.id, e.target.value)}
+                    className="w-14 text-center text-sm font-medium tabular-nums border border-slate-200 rounded-lg px-1 py-1 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    aria-label={`Cantidad de ${item.nombre}`}
+                  />
                   <button
                     type="button"
                     onClick={() => updateQty(item.id, 1)}
@@ -287,9 +434,9 @@ export default function POSPage() {
               return (
                 <button
                   key={p.id}
-                  onClick={() => addToCart(p)}
+                  onClick={() => addProductToCart(p)}
                   disabled={p.stock_actual <= 0}
-                  className={`relative p-4 rounded-2xl flex flex-col text-left transition-all border ${
+                  className={`relative p-4 rounded-2xl flex items-stretch gap-3 text-left transition-all border ${
                     p.stock_actual <= 0
                       ? "bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed"
                       : inCart
@@ -297,32 +444,49 @@ export default function POSPage() {
                       : "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md hover:shadow-sky-100 active:scale-95"
                   }`}
                 >
-                  {inCart && (
-                    <span className="absolute top-2.5 right-2.5 w-5 h-5 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold">
-                      {inCart.cantidad}
-                    </span>
-                  )}
-                  <h3
-                    className={`font-semibold text-sm leading-tight mb-2 ${
-                      inCart ? "text-white" : "text-slate-800"
-                    }`}
-                  >
-                    {p.nombre}
-                  </h3>
-                  <p
-                    className={`font-bold text-lg mt-auto ${
-                      inCart ? "text-white" : "text-sky-600"
-                    }`}
-                  >
-                    {formatCOP(p.precio_venta)}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${inCart ? "text-white/70" : "text-slate-400"}`}>
-                    {p.stock_actual <= 0
-                      ? "Sin stock"
-                      : p.stock_actual <= 5
-                      ? `⚠ ${p.stock_actual} restantes`
-                      : `Stock: ${p.stock_actual}`}
-                  </p>
+                  <div className={`w-14 h-14 shrink-0 rounded-xl overflow-hidden flex items-center justify-center ${
+                    inCart ? "bg-white/20" : "bg-slate-100"
+                  }`}>
+                    {p.imagen ? (
+                      <img
+                        src={p.imagen}
+                        alt={p.nombre}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Package className={`w-7 h-7 ${inCart ? "text-white/70" : "text-slate-400"}`} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 flex flex-col py-0.5">
+                    {inCart && (
+                      <span className="absolute top-2.5 right-2.5 min-w-[1.25rem] h-5 px-1 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold">
+                        {isUnidadDecimal(inCart.unidad ?? p.unidad)
+                          ? `${inCart.cantidad % 1 === 0 ? inCart.cantidad : inCart.cantidad.toFixed(2)}${getUnidadSufijo(inCart.unidad ?? p.unidad).trim()}`
+                          : inCart.cantidad}
+                      </span>
+                    )}
+                    <h3
+                      className={`font-semibold text-sm leading-tight mb-1 ${
+                        inCart ? "text-white" : "text-slate-800"
+                      }`}
+                    >
+                      {p.nombre}
+                    </h3>
+                    <p
+                      className={`font-bold text-lg mt-auto ${
+                        inCart ? "text-white" : "text-sky-600"
+                      }`}
+                    >
+                      {formatCOP(p.precio_venta)}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${inCart ? "text-white/70" : "text-slate-400"}`}>
+                      {p.stock_actual <= 0
+                        ? "Sin producto"
+                        : p.stock_actual <= 5
+                        ? `⚠ ${isUnidadDecimal(p.unidad) ? `${p.stock_actual}${getUnidadSufijo(p.unidad)}` : p.stock_actual} restantes`
+                        : `Cantidad: ${isUnidadDecimal(p.unidad) ? `${p.stock_actual}${getUnidadSufijo(p.unidad)}` : p.stock_actual}`}
+                    </p>
+                  </div>
                 </button>
               );
             })}

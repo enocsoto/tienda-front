@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
+import { formatCOP } from "@/lib/format";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
-import { Search, Plus, Pencil, Package, AlertTriangle, Trash2, ChevronLeft, ChevronRight, Upload, X } from "lucide-react";
+import { Search, Plus, Pencil, Package, AlertTriangle, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Upload, X, CheckCircle } from "lucide-react";
 import { API_URL } from "@/lib/api";
 
 interface Product {
@@ -21,6 +22,9 @@ interface Product {
 
 const PAGE_SIZE = 10;
 
+type SortField = "nombre" | "categoria" | "costo" | "precio_venta" | "stock_actual";
+type SortOrder = "ASC" | "DESC";
+
 export default function InventarioPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +35,8 @@ export default function InventarioPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [user, setUser] = useState<{ role?: string } | null>(null);
+  const [sortBy, setSortBy] = useState<SortField>("nombre");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("ASC");
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{
@@ -59,6 +65,8 @@ export default function InventarioPage() {
       if (q) params.set("search", q);
       params.set("page", String(pageNum));
       params.set("limit", String(PAGE_SIZE));
+      params.set("sortBy", sortBy);
+      params.set("sortOrder", sortOrder);
       const raw = await fetchApi(`/inventario?${params.toString()}`);
       const res = raw as { data?: unknown[]; total?: number; page?: number; totalPages?: number };
       // Soporta respuesta paginada { data, total, totalPages } o array directo (fallback)
@@ -94,18 +102,53 @@ export default function InventarioPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sortBy, sortOrder]);
 
   const pathname = usePathname();
 
-  // Cargar lista al montar, al cambiar página o búsqueda (debounce 300ms)
+  const handleSort = (field: SortField) => {
+    setSortBy(field);
+    setSortOrder((prev) => (sortBy === field && prev === "ASC" ? "DESC" : "ASC"));
+    setPage(1);
+  };
+
+  const SortHeader = ({
+    field,
+    label,
+    className,
+  }: {
+    field: SortField;
+    label: string;
+    className?: string;
+  }) => (
+    <th className={className}>
+      <button
+        type="button"
+        onClick={() => handleSort(field)}
+        className="inline-flex items-center gap-1 w-full text-left hover:text-sky-600 transition-colors"
+      >
+        {label}
+        {sortBy === field ? (
+          sortOrder === "ASC" ? (
+            <ChevronUp className="w-3.5 h-3.5 text-sky-500" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 text-sky-500" />
+          )
+        ) : (
+          <span className="w-3.5 h-3.5 opacity-30" aria-hidden />
+        )}
+      </button>
+    </th>
+  );
+
+  // Cargar lista al montar, al cambiar página, búsqueda o orden (debounce 300ms)
   useEffect(() => {
     if (pathname !== "/admin/inventario") return;
     const timer = window.setTimeout(() => {
       loadProducts(search, page);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [pathname, search, page, loadProducts]);
+  }, [pathname, search, page, sortBy, sortOrder, loadProducts]);
 
   const handleImportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -226,13 +269,13 @@ export default function InventarioPage() {
           {outOfStock > 0 && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm font-medium px-4 py-2.5 rounded-xl">
               <AlertTriangle className="w-4 h-4" />
-              {outOfStock} producto{outOfStock > 1 ? "s" : ""} sin stock
+              {outOfStock} producto{outOfStock > 1 ? "s" : ""} sin producto
             </div>
           )}
           {lowStock > 0 && (
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium px-4 py-2.5 rounded-xl">
               <AlertTriangle className="w-4 h-4" />
-              {lowStock} producto{lowStock > 1 ? "s" : ""} con stock crítico
+              {lowStock} producto{lowStock > 1 ? "s" : ""} con cantidad crítica
             </div>
           )}
         </div>
@@ -261,21 +304,11 @@ export default function InventarioPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Producto
-                </th>
-                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Categoría
-                </th>
-                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Costo
-                </th>
-                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  P. Venta
-                </th>
-                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Cantidad
-                </th>
+                <SortHeader className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider" field="nombre" label="Producto" />
+                <SortHeader className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider" field="categoria" label="Categoría" />
+                <SortHeader className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider" field="costo" label="Costo" />
+                <SortHeader className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider" field="precio_venta" label="P. Venta" />
+                <SortHeader className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider" field="stock_actual" label="Cantidad" />
                 <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Unidad
                 </th>
@@ -332,16 +365,16 @@ export default function InventarioPage() {
                       <Badge variant="sky">{p.categoria}</Badge>
                     </td>
                     <td className="py-4 px-4 text-sm text-slate-600">
-                      ${p.costo.toFixed(2)}
+                      {formatCOP(p.costo)}
                     </td>
                     <td className="py-4 px-4">
                       <span className="font-semibold text-sm text-sky-700">
-                        ${p.precio_venta.toFixed(2)}
+                        {formatCOP(p.precio_venta)}
                       </span>
                     </td>
                     <td className="py-4 px-4">
                       {p.stock_actual === 0 ? (
-                        <Badge variant="red">Sin stock</Badge>
+                        <Badge variant="red">Sin producto</Badge>
                       ) : p.stock_actual <= 5 ? (
                         <Badge variant="amber">{p.stock_actual} bajo</Badge>
                       ) : (
@@ -438,11 +471,25 @@ export default function InventarioPage() {
                   ref={fileInputRef}
                   type="file"
                   accept=".xlsx,.xls,.csv"
-                  className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-sky-50 file:text-sky-700 file:font-medium hover:file:bg-sky-100"
+                  disabled={importing}
+                  onChange={() => importResult && setImportResult(null)}
+                  className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-sky-50 file:text-sky-700 file:font-medium hover:file:bg-sky-100 disabled:opacity-60"
                 />
               </div>
               {importResult && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                <div
+                  className={`rounded-xl border p-4 space-y-2 ${
+                    importResult.errors.length === 0
+                      ? "border-green-200 bg-green-50"
+                      : "border-amber-200 bg-amber-50"
+                  }`}
+                >
+                  {importResult.errors.length === 0 ? (
+                    <p className="flex items-center gap-2 text-sm font-medium text-green-800">
+                      <CheckCircle className="w-5 h-5 shrink-0" />
+                      Importación completada correctamente
+                    </p>
+                  ) : null}
                   <p className="text-sm font-medium text-slate-800">
                     {importResult.created} producto(s) creados/actualizados, {importResult.entriesCreated} ingreso(s) registrados.
                   </p>
@@ -465,10 +512,10 @@ export default function InventarioPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={importing}
-                  className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 disabled:opacity-50"
+                  disabled={importing || (!!importResult && importResult.errors.length === 0)}
+                  className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {importing ? "Subiendo…" : "Importar"}
+                  {importing ? "Importando…" : importResult && importResult.errors.length === 0 ? "Completado" : "Importar"}
                 </button>
               </div>
             </form>

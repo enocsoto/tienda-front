@@ -8,9 +8,16 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/ui/StatCard";
 import { Toast, ToastMessage } from "@/components/ui/Toast";
-import { Filter, ArrowLeft, BarChart3, FileDown, DollarSign, ShoppingCart, Package } from "lucide-react";
+import { Filter, ArrowLeft, BarChart3, FileDown, DollarSign, ShoppingCart, Package, CheckCircle2, Loader2 } from "lucide-react";
 
 type Granularity = "daily" | "weekly" | "monthly" | "custom";
+
+interface SaleItemDisplay {
+  product?: { nombre?: string };
+  cantidad?: number;
+  precio_unitario?: number;
+  subtotal?: number;
+}
 
 interface Sale {
   id?: string;
@@ -19,7 +26,13 @@ interface Sale {
   tipo: string;
   metodo_pago: string;
   cliente_nombre?: string;
+  cliente_telefono?: string;
   total: number;
+  origen?: string;
+  pago_confirmado?: boolean;
+  direccion?: string;
+  fecha_hora_entrega?: string;
+  items?: SaleItemDisplay[];
 }
 
 interface SalesSummary {
@@ -88,8 +101,10 @@ function getDateRangeForGranularity(g: Granularity, from?: string, to?: string):
 export default function HistorialVentasPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [summary, setSummary] = useState<SalesSummary | null>(null);
+  const [pedidosPendientes, setPedidosPendientes] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [granularity, setGranularity] = useState<Granularity>("monthly");
   const [desde, setDesde] = useState("");
@@ -118,9 +133,36 @@ export default function HistorialVentasPage() {
     }
   }, []);
 
+  const loadPedidosPendientes = useCallback(async () => {
+    try {
+      const data = await fetchApi("/ventas/pedidos-pendientes-pago");
+      setPedidosPendientes(Array.isArray(data) ? data : []);
+    } catch {
+      setPedidosPendientes([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPedidosPendientes();
+  }, [loadPedidosPendientes]);
+
   useEffect(() => {
     if (queryFrom && queryTo) loadData(queryFrom, queryTo, granularity);
   }, [queryFrom, queryTo, granularity, loadData]);
+
+  const handleConfirmarPago = async (saleId: string) => {
+    setConfirmandoId(saleId);
+    try {
+      await fetchApi(`/ventas/${saleId}/confirmar-pago`, { method: "PATCH" });
+      setToast({ text: "Pago confirmado correctamente", type: "success" });
+      await loadPedidosPendientes();
+      if (queryFrom && queryTo) loadData(queryFrom, queryTo, granularity);
+    } catch (err) {
+      setToast({ text: err instanceof Error ? err.message : "Error al confirmar pago", type: "error" });
+    } finally {
+      setConfirmandoId(null);
+    }
+  };
 
   const handleFilter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +235,54 @@ export default function HistorialVentasPage() {
           </div>
         }
       />
+
+      {pedidosPendientes.length > 0 && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-amber-100 bg-amber-100/50">
+            <h2 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Pedidos pendientes de confirmar pago ({pedidosPendientes.length})
+            </h2>
+            <p className="text-xs text-amber-700 mt-1">
+              Estos pedidos no se incluyen en el balance ni reportes hasta que confirmes que recibiste el pago.
+            </p>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {pedidosPendientes.map((p, index) => (
+              <div
+                key={saleKey(p, index)}
+                className="px-6 py-4 flex flex-wrap items-center justify-between gap-4 hover:bg-amber-50/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-800">{p.cliente_nombre}</p>
+                  <p className="text-sm text-slate-500">{p.cliente_telefono}</p>
+                  {p.direccion && <p className="text-xs text-slate-400 mt-0.5">{p.direccion}</p>}
+                  {p.fecha_hora_entrega && (
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Entrega: {new Date(p.fecha_hora_entrega).toLocaleString("es-CO")}
+                    </p>
+                  )}
+                  <p className="text-sm font-semibold text-sky-700 mt-1">{formatCOP(Number(p.total))}</p>
+                  <p className="text-xs text-slate-400 capitalize">{p.metodo_pago?.toLowerCase()}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmarPago(saleKey(p, index))}
+                  disabled={confirmandoId === saleKey(p, index)}
+                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-medium text-sm transition-colors"
+                >
+                  {confirmandoId === saleKey(p, index) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  {confirmandoId === saleKey(p, index) ? "Confirmando…" : "Confirmar pago"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {summary && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
