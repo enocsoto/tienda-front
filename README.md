@@ -54,13 +54,13 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 |------|-------------|
 | `/` | Página principal (landing / inicio) |
 | `/login` | Inicio de sesión (admin) |
-| `/comprar` | Tienda pública: catálogo y pedidos (envío a domicilio) |
+| `/purchase` | Tienda pública: catálogo y pedidos (envío a domicilio) |
 | `/admin/*` | Panel de administración (requiere login) |
 
 ### Panel Admin
 
 - **Inventario** — Listado, nuevo producto, editar, importar Excel
-- **Ventas** — Registrar venta, historial
+- **Ventas** — Registrar venta, historial (`/admin/sales/history`)
 - **Créditos** — Listado y pagos de créditos
 - **Caja** — Balance, egresos, utilidad
 - **Configuración** — Ganancia, cuentas Nequi
@@ -70,13 +70,13 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 - **Tema**: Sky Blue y blanco (profesional y limpio).
 - **Componentes reutilizables**: `src/components/ui/` (Badge, PageHeader, StatCard, Toast, etc.).
-- **Utilidades**: `src/lib/api.ts` (fetch con token), `src/lib/format.ts`, `src/lib/inventario.ts`.
+- **Utilidades**: `src/lib/api.ts` (fetch con token), `src/lib/format.ts`, `src/lib/inventory.ts`.
 
 ## API y autenticación
 
 - El frontend usa `NEXT_PUBLIC_API_URL` para todas las peticiones al backend.
 - Tras el login, el token JWT se guarda en `localStorage` y se envía en el header `Authorization: Bearer <token>` en las rutas protegidas.
-- Rutas públicas (catálogo y crear pedido en `/comprar`) no envían token.
+- Rutas públicas (catálogo y crear pedido en `/purchase`) no envían token.
 
 Para el detalle de endpoints, DTOs y reglas de negocio del backend, consulta el **[README y AGENTS.md del backend](../kiosko-backend/README.md)**.
 

@@ -4,7 +4,7 @@ interface StatCardProps {
   title: string;
   value: string;
   icon: LucideIcon;
-  variant?: "default" | "success" | "danger" | "primary";
+  variant?: "default" | "success" | "danger" | "primary" | "violet" | "amber";
   subtitle?: string;
 }
 
@@ -13,6 +13,8 @@ const variants = {
   success: "bg-emerald-600 border-transparent text-white",
   danger: "bg-red-500 border-transparent text-white",
   primary: "bg-sky-600 border-transparent text-white",
+  violet: "bg-violet-600 border-transparent text-white",
+  amber: "bg-amber-500 border-transparent text-white",
 };
 
 const iconVariants = {
@@ -20,6 +22,8 @@ const iconVariants = {
   success: "bg-white/20 text-white",
   danger: "bg-white/20 text-white",
   primary: "bg-white/20 text-white",
+  violet: "bg-white/20 text-white",
+  amber: "bg-white/20 text-white",
 };
 
 export function StatCard({

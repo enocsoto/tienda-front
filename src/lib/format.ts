@@ -60,6 +60,17 @@ export function parseNumberInput(str: string): number {
 }
 
 /**
+ * Fecha del calendario local en `YYYY-MM-DD` (inputs `type="date"`).
+ * Evita el desfase de `toISOString().slice(0, 10)` en zonas como Colombia (UTC-5).
+ */
+export function fechaLocalYMD(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
  * Parsea una fecha solo-día (YYYY-MM-DD) como fecha local para evitar que
  * medianoche UTC se muestre como el día anterior en zonas como Colombia (UTC-5).
  */
