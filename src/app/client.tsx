@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
+import { getDefaultAdminRoute } from "@/lib/auth";
 import { Store, Eye, EyeOff, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
@@ -27,7 +28,7 @@ export default function LoginPage() {
       if (data?.access_token) {
         localStorage.setItem("token", data.access_token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        router.push("/admin/settings");
+        router.push(getDefaultAdminRoute(data.user?.role));
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Credenciales incorrectas");

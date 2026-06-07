@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { fetchApi } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Toast, ToastMessage } from "@/components/ui/Toast";
-import { Percent, Save, Store, Image, CreditCard, Plus, Pencil, Trash2 } from "lucide-react";
+import { Percent, Save, Store, Image as ImageIcon, CreditCard, Plus, Pencil, Trash2 } from "lucide-react";
 
 interface NequiCuenta {
   numero: string;
@@ -121,7 +122,7 @@ export default function ConfiguracionPage() {
     }
     setNequiSaving(true);
     try {
-      let next = [...nequiCuentas];
+      const next = [...nequiCuentas];
       if (nequiEditingIndex !== null) {
         next[nequiEditingIndex] = { numero: numero.trim(), nombre: nombre.trim(), apellido: apellido?.trim() || "" };
         setNequiEditingIndex(null);
@@ -276,7 +277,7 @@ export default function ConfiguracionPage() {
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-xs text-slate-400">o</span>
                 <label className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-600 hover:text-sky-700 cursor-pointer">
-                  <Image className="w-3.5 h-3.5" />
+                  <ImageIcon className="w-3.5 h-3.5" />
                   Subir imagen
                   <input
                     type="file"
@@ -287,9 +288,16 @@ export default function ConfiguracionPage() {
                 </label>
               </div>
               {tiendaLogo && (
-                <div className="mt-2 w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                <div className="mt-2 relative w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
                   {tiendaLogo.startsWith("data:") || tiendaLogo.startsWith("http") ? (
-                    <img src={tiendaLogo} alt="Logo" className="w-full h-full object-contain" />
+                    <Image
+                      src={tiendaLogo}
+                      alt="Logo de la tienda"
+                      fill
+                      className="object-contain"
+                      sizes="48px"
+                      unoptimized
+                    />
                   ) : (
                     <Store className="w-6 h-6 text-slate-300" />
                   )}

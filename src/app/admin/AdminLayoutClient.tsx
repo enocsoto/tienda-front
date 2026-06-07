@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -19,6 +20,12 @@ import {
   HandCoins,
 } from "lucide-react";
 import { Toast, ToastMessage } from "@/components/ui/Toast";
+import {
+  getDefaultAdminRoute,
+  isAdminOnlyPath,
+  isAdminRole,
+  type StoredUser,
+} from "@/lib/auth";
 
 const SIDEBAR_COLLAPSED_KEY = "kiosko-sidebar-collapsed";
 const NOTIFICATIONS_UPDATED_EVENT = "kiosko-notifications-updated";
@@ -74,7 +81,7 @@ const navItems: NavItem[] = [
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<{ username: string; role: string } | null>(null);
+  const [user, setUser] = useState<StoredUser | null>(null);
   const [unread, setUnread] = useState(0);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -138,9 +145,20 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
 
   useEffect(() => {
     if (!user) return;
+    if (!isAdminRole(user.role) && isAdminOnlyPath(pathname)) {
+      router.replace(getDefaultAdminRoute(user.role));
+    }
+  }, [user, pathname, router]);
+
+  const isAdmin = isAdminRole(user?.role);
+  const visibleNavItems = isAdmin
+    ? navItems
+    : navItems.filter((item) => item.href !== "/admin/settings");
+
+  useEffect(() => {
+    if (!user) return;
 
     let isActive = true;
-    let intervalId: ReturnType<typeof setInterval> | undefined;
 
     const loadUnread = async (showToastOnIncrease: boolean) => {
       try {
@@ -179,7 +197,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
 
     // Primer fetch sin mostrar toast
     loadUnread(false);
-    intervalId = setInterval(() => {
+    const intervalId = setInterval(() => {
       loadUnread(true);
     }, 10000);
 
@@ -244,9 +262,16 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
           }`}
         >
           <div className={`flex items-center gap-2 min-w-0 ${!isCollapsed ? "flex-1" : ""}`}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm shrink-0 overflow-hidden bg-sky-600">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm shrink-0 overflow-hidden bg-sky-600 relative">
               {tienda.logo ? (
-                <img src={tienda.logo} alt="" className="w-full h-full object-cover" />
+                <Image
+                  src={tienda.logo}
+                  alt={tienda.nombre ? `Logo de ${tienda.nombre}` : "Logo de la tienda"}
+                  fill
+                  className="object-cover"
+                  sizes="32px"
+                  unoptimized
+                />
               ) : (
                 <Store className="w-4 h-4 text-white" />
               )}
@@ -280,7 +305,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
             isCollapsed ? "px-1.5" : "px-2"
           }`}
         >
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const hasChildren = !!item.children;
             const isExpanded = expanded.includes(item.name);

@@ -20,6 +20,9 @@
 # production
 /build
 
+# atl (SDD skill registry — local agent index)
+/.atl/
+
 # misc
 .DS_Store
 *.pem

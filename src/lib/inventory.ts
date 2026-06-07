@@ -90,4 +90,44 @@ export async function eliminarCategoria(id: string): Promise<{
   }>;
 }
 
+/** Estado de lista de inventario para conservar paginación/filtros al editar */
+export type InventoryListQuery = {
+  page?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  /** Vista solo productos inactivos (desactivados) */
+  inactivos?: boolean;
+};
+
+export function inventoryListQueryString(state: InventoryListQuery): string {
+  const params = new URLSearchParams();
+  if (state.page && state.page > 1) params.set("page", String(state.page));
+  if (state.search?.trim()) params.set("search", state.search.trim());
+  if (state.sortBy && state.sortBy !== "nombre") params.set("sortBy", state.sortBy);
+  if (state.sortOrder && state.sortOrder !== "ASC") params.set("sortOrder", state.sortOrder);
+  if (state.inactivos) params.set("inactivos", "1");
+  const q = params.toString();
+  return q ? `?${q}` : "";
+}
+
+export function inventoryListHref(basePath: string, state: InventoryListQuery): string {
+  return `${basePath}${inventoryListQueryString(state)}`;
+}
+
+export function inventoryListQueryFromParams(
+  params: URLSearchParams | ReadonlyURLSearchParams,
+): InventoryListQuery {
+  const pageRaw = parseInt(params.get("page") ?? "1", 10);
+  return {
+    page: Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1,
+    search: params.get("search") ?? "",
+    sortBy: params.get("sortBy") ?? "nombre",
+    sortOrder: params.get("sortOrder") ?? "ASC",
+    inactivos: params.get("inactivos") === "1",
+  };
+}
+
+type ReadonlyURLSearchParams = Pick<URLSearchParams, "get">;
+
 export { OPCION_OTRA };

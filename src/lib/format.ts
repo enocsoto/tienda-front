@@ -29,6 +29,15 @@ export function formatNumberInput(value: number): string {
  * Parsea string de input con formato colombiano (punto=miles, coma=decimal).
  * Acepta: "6.600", "6,6", "6600", "1.234,56"
  */
+/**
+ * Porcentaje de ganancia para UI: enteros sin decimal ("20"), fracciones sin ceros de más ("12.5").
+ */
+export function formatGananciaPct(pct: number): string {
+  if (!Number.isFinite(pct)) return "0";
+  if (Math.abs(pct - Math.round(pct)) < 1e-6) return String(Math.round(pct));
+  return pct.toFixed(2).replace(/\.?0+$/, "");
+}
+
 export function parseNumberInput(str: string): number {
   const s = String(str ?? "").trim().replace(/\s/g, "");
   if (!s) return 0;
